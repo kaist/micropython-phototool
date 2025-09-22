@@ -1,1 +1,0 @@
-You can put audio(mp3/wav/amr/Wamr) files in this folder.
