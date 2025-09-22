@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Settings</title>
+<style>
+  :root{--bg:#000;--card:#111;--fg:#fff;--muted:#888;--accent:#1e90ff;--border:#222}
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,sans-serif}
+  .header{display:flex;align-items:center;justify-content:center;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--border)}
+  .wrap{max-width:720px;margin:0 auto;padding:20px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  h2{margin:0 0 12px}
+  p{margin:0 0 10px}
+  .muted{color:var(--muted)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .field{flex:1 1 220px;min-width:220px}
+  label{display:block;margin:8px 0 6px;font-size:14px;color:var(--muted)}
+  input{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;background:#0b0b0b;color:var(--fg);outline:none}
+  input:focus{border-color:#2b6fff}
+  .hstack{display:flex;gap:10px;align-items:center}
+  .hstack input[type="number"]{max-width:110px}
+  input[type="range"]{width:100%}
+  .btn{display:inline-block;padding:12px 16px;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none;border:0;cursor:pointer}
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:#2f2f2f}
+  .hr{height:1px;background:var(--border);margin:14px 0}
+  code{background:#0b0b0b;padding:2px 6px;border-radius:6px;border:1px solid var(--border)}
+  .toggle{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#0b0b0b}
+  .toggle input{width:auto}
+</style>
+</head>
+<body>
+  <div class="header"><strong>Device Settings</strong></div>
+  <div class="wrap">
+    <div class="card">
+
+      <form method="get" action="/save" autocomplete="on">
+        <div class="row">
+          <div class="field">
+            <label for="name">Device Name</label>
+            <input id="name" name="name" placeholder="" maxlength="32" required>
+          </div>
+
+          <div class="field">
+            <label for="brightness">Brightness (0–100)</label>
+            <div class="hstack">
+              <input id="brightness" name="brightness" type="range" min="0" max="100" step="1" value="100" oninput="bnum.value=this.value">
+              <input id="bnum" type="number" min="0" max="100" step="1" value="50" oninput="brightness.value=this.value">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="autooff">Auto power off (minutes)</label>
+            <div class="hstack">
+              <input id="autooff" name="autooff_min" type="number" min="0" max="60" step="1" placeholder="" value="0">
+              <span class="muted">0 — never</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="sound">Sound</label>
+            <div class="toggle">
+              <input id="sound" name="sound" type="checkbox" value="1">
+              <span id="sound_label">Enable</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:14px">
+          <button class="btn" type="submit">Save</button>
+          <a class="btn secondary" href="/">Cancel</a>
+        </div>
+      </form>
+
+
+    </div>
+  </div>
+
+  <script>
+    // Подставим фактический хост/IP для подсказок
+    (function(){
+      var host = location.host || "192.168.4.1";
+      var url = "http://" + host + "/";
+      var el1 = document.getElementById("ip");
+      var el2 = document.getElementById("ip2");
+      if(el1) el1.textContent = url;
+      if(el2) el2.textContent = host;
+    })();
+
+    // Текст для чекбокса «Звук»
+    (function(){
+      var cb = document.getElementById('sound');
+      var lbl = document.getElementById('sound_label');
+      function update(){
+        lbl.textContent = cb.checked ? 'Enable' : 'Disable';
+      }
+      cb.addEventListener('change', update);
+      update();
+    })();
+
+    // Автозаполнение формы из /api/config
+    (function(){
+      function setVal(id, v){
+        var el = document.getElementById(id);
+        if(!el) return;
+        if(el.type === 'checkbox'){
+          el.checked = !!v;
+        } else {
+          el.value = v;
+        }
+      }
+      fetch('/api/config').then(function(r){
+        if(!r.ok) throw new Error('HTTP '+r.status);
+        return r.json();
+      }).then(function(cfg){
+        setVal('name', cfg.name || 'MyDevice');
+        setVal('brightness', cfg.brightness != null ? cfg.brightness : 50);
+        setVal('bnum', cfg.brightness != null ? cfg.brightness : 50);
+        setVal('autooff', cfg.autooff_min != null ? cfg.autooff_min : 0);
+        setVal('sound', (cfg.sound|0) ? 1 : 0);
+        var ev = new Event('input');
+        document.getElementById('brightness').dispatchEvent(ev);
+        // Обновим подпись «Звук»
+        var e = new Event('change');
+        document.getElementById('sound').dispatchEvent(e);
+      }).catch(function(err){
+        // тихо игнорируем — останутся дефолты
+        // console.log(err);
+      });
+    })();
+  </script>
+</body>
+</html>

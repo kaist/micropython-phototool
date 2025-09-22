@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Gallery — dark monochrome</title>
+  <style>
+    :root {
+      /* Dark monochrome palette */
+      --bg: #0b0b0c;
+      --surface: #121214;
+      --surface-2: #161618;
+      --text: #e6e6e6;
+      --muted: #9a9a9a;
+      --border: #27272a;
+      --shadow: 0 1px 2px rgba(0,0,0,.6), 0 8px 24px rgba(0,0,0,.35);
+      --radius: 0; /* square corners */
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 600px at 10% -40%, #101012, var(--bg));
+      letter-spacing: .2px;
+    }
+
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: color-mix(in oklab, var(--surface) 94%, transparent);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(6px);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 14px 16px; }
+
+    /* Buttons */
+    button {
+      appearance: none; border: 1px solid var(--border); cursor: pointer;
+      color: var(--text); background: linear-gradient(180deg, var(--surface-2), #101012);
+      padding: 10px 14px; border-radius: var(--radius);
+      transition: transform .06s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+      position: relative; overflow: hidden; /* for ripple */
+      min-height: 40px;
+    }
+    button:hover { box-shadow: var(--shadow); border-color: #2f2f33; }
+    button:active { transform: translateY(1px); }
+
+    .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    /* Current image */
+    .current-preview { margin: 16px 0 6px; border: 1px solid var(--border); background: var(--surface); padding: 12px; box-shadow: var(--shadow); }
+    .current-preview h3 { margin: 0 0 10px; font-weight: 600; }
+    .current-preview img { display: block; max-width: 100%; max-height: 320px; margin: 0 auto; border: 1px solid var(--border); }
+
+    /* Settings */
+    .settings { margin: 12px 0 10px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); padding: 12px; display: grid; gap: 10px; }
+    .settings h3 { margin: 0 0 6px; font-weight: 600; }
+    .field { display: grid; grid-template-columns: 220px 1fr; gap: 10px; align-items: center; }
+    .field small { color: var(--muted); }
+    .controls { display: grid; gap: 6px; }
+    input[type="number"], input[type="text"] { width: 100%; padding: 10px 12px; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); }
+    input[type="checkbox"] { width: 18px; height: 18px; accent-color: #fff; }
+    .checkbox-row { display: flex; align-items: center; gap: 10px; }
+    .actions-row { display: flex; gap: 10px; }
+
+    /* Gallery layout */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 16px 0 28px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); display: grid; grid-template-rows: 160px auto; }
+    .thumb { display: block; width: 100%; height: 160px; object-fit: cover; background: #0a0a0a; }
+
+    /* Align actions to full width: two equal columns */
+    .meta { padding: 10px 12px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
+    .actions > button { width: 100%; height: 40px; }
+
+    .empty { opacity: .85; text-align: center; padding: 60px 12px; color: var(--muted); }
+
+    /* Ripple */
+    .ripple-el { position: absolute; border-radius: 50%; background: rgba(255,255,255,.08); transform: scale(0); animation: ripple .5s ease-out; pointer-events: none; }
+    @keyframes ripple { to { transform: scale(8); opacity: 0; } }
+
+    /* ===== Mobile tweaks ===== */
+    @media (max-width: 640px) {
+      .wrap { padding: 10px; }
+      button { padding: 9px 12px; min-height: 36px; }
+      .current-preview { padding: 10px; }
+      .current-preview img { max-height: 220px; }
+
+      .settings { padding: 10px; gap: 8px; }
+      .field { grid-template-columns: 1fr; gap: 6px; }
+      .field label { font-size: 13px; color: var(--muted); }
+      input[type="number"], input[type="text"] { padding: 9px 10px; }
+      .checkbox-row { justify-content: flex-start; }
+      .actions-row { display: grid; grid-template-columns: 1fr; }
+
+      .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+      .card { grid-template-rows: 130px auto; }
+      .thumb { height: 130px; }
+      .actions > button { height: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="toolbar">
+        <button id="addBtn">Add images</button>
+        <input id="fileInput" type="file" accept="image/*" multiple hidden>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="current-preview" id="currentPreview" hidden>
+      <h3>Current image</h3>
+      <img id="currentImg" alt="" />
+    </div>
+
+    <section class="settings" id="settings">
+      <h3>Settings</h3>
+      <div class="field">
+        <label for="pxCount">Pixel count (integer)</label>
+        <div class="controls">
+          <input id="pxCount" type="number" inputmode="numeric" min="1" step="1" placeholder="e.g. 64" />
+          <small>Number of pixels to process/use.</small>
+        </div>
+      </div>
+      <div class="field">
+        <label for="canonMode">Act as Canon remote</label>
+        <div class="controls checkbox-row">
+          <input id="canonMode" type="checkbox" />
+          <small>Enable Canon-remote behaviour.</small>
+        </div>
+      </div>
+      <div class="field">
+        <label for="startPause">Start pause (seconds)</label>
+        <div class="controls">
+          <input id="startPause" type="number" inputmode="numeric" min="0" step="1" placeholder="0" />
+          <small>Delay before action begins.</small>
+        </div>
+      </div>
+      <div class="actions-row">
+        <button id="saveSettings">Save settings</button>
+      </div>
+    </section>
+
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty" hidden>
+      <p>No images yet. <b>Add</b> an image — it will be stored in your browser.</p>
+    </div>
+  </main>
+
+  <template id="cardTpl">
+    <article class="card" data-id>
+      <img class="thumb" alt="" />
+      <div class="meta">
+        <div class="actions">
+          <button class="up">Upload</button>
+          <button class="del">Delete</button>
+        </div>
+      </div>
+    </article>
+  </template>
+
+  <script>
+  // ===== IndexedDB (local storage) =====
+  const DB_NAME = 'image-vault-db';
+  const DB_VER  = 3;           // KV for settings + currentId
+  const STORE   = 'images';
+  const KV      = 'kv';
+  let db;
+
+  function idbOpen() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          const s = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          s.createIndex('addedAt', 'addedAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(KV)) {
+          db.createObjectStore(KV, { keyPath: 'key' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function idbTx(mode = 'readonly', store = STORE) {
+    const tx = db.transaction(store, mode);
+    const s = tx.objectStore(store);
+    return { tx, store: s, done: new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); }) };
+  }
+  function reqP(req){ return new Promise((res, rej)=>{ req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error); }); }
+
+  async function addImage(file) {
+    const { store, done } = idbTx('readwrite', STORE);
+    const rec = { type: file.type || 'image/*', size: file.size || 0, addedAt: Date.now(), blob: file };
+    await reqP(store.add(rec)); await done;
+  }
+  async function getAllImages() { const { store } = idbTx('readonly', STORE); return await reqP(store.getAll()); }
+  async function deleteImage(id){ const { store, done } = idbTx('readwrite', STORE); store.delete(Number(id)); await done; }
+
+  // KV helpers for persisting current image id and settings
+  async function kvSet(key, value){ const { store, done } = idbTx('readwrite', KV); store.put({ key, value }); await done; }
+  async function kvGet(key){ const { store } = idbTx('readonly', KV); const r = await reqP(store.get(key)); return r ? r.value : undefined; }
+  async function kvDelete(key){ const { store, done } = idbTx('readwrite', KV); store.delete(key); await done; }
+
+  // ===== UI refs =====
+  const el = {
+    grid: document.getElementById('grid'),
+    empty: document.getElementById('empty'),
+    tpl: document.getElementById('cardTpl'),
+    addBtn: document.getElementById('addBtn'),
+    fileInput: document.getElementById('fileInput'),
+    currentPreview: document.getElementById('currentPreview'),
+    currentImg: document.getElementById('currentImg'),
+    pxCount: document.getElementById('pxCount'),
+    canonMode: document.getElementById('canonMode'),
+    startPause: document.getElementById('startPause'),
+    saveSettings: document.getElementById('saveSettings'),
+  };
+
+  let cacheURLs = new Map(); // id -> objectURL
+  let currentId = null;      // persisted via KV
+
+  function addRipple(e){
+    const btn = e.currentTarget;
+    const r = document.createElement('span');
+    r.className = 'ripple-el';
+    const rect = btn.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 1.2;
+    r.style.width = r.style.height = size + 'px';
+    r.style.left = (e.clientX - rect.left - size/2) + 'px';
+    r.style.top  = (e.clientY - rect.top  - size/2) + 'px';
+    btn.appendChild(r);
+    r.addEventListener('animationend', ()=> r.remove());
+  }
+  function wireRipple(btn){ btn.addEventListener('click', addRipple, { passive: true }); }
+
+  // ===== Robust decode: Blob -> ImageData (with fallback for Safari/iOS) =====
+  async function decodeToImageData(file) {
+    try {
+      const bmp = await createImageBitmap(file);
+      const canvas = ('OffscreenCanvas' in self)
+        ? new OffscreenCanvas(bmp.width, bmp.height)
+        : Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bmp, 0, 0);
+      return ctx.getImageData(0, 0, bmp.width, bmp.height);
+    } catch (e) {
+      const url = URL.createObjectURL(file);
+      try {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        const c = Object.assign(document.createElement('canvas'), { width: img.naturalWidth, height: img.naturalHeight });
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return ctx.getImageData(0, 0, c.width, c.height);
+      } finally { URL.revokeObjectURL(url); }
+    }
+  }
+
+  // ===== Build P16 (RGB565) from original image blob =====
+  async function buildP16FromBlob(file){
+  const { data, width: w, height: h } = await decodeToImageData(file);
+
+  // ВАЖНО: заголовок меняется местами — P16 h w
+  const header = new TextEncoder().encode(`P16 ${h} ${w}\n`);
+  const parts = [header];
+
+  // Одна "строка" вывода соответствует одному столбцу исходника: длина 2*h байт
+  const row = new Uint8Array(2 * h);
+
+  for (let x = 0; x < w; x++) {
+    // Собираем столбец x сверху вниз в один выходной ряд
+    for (let y = 0; y < h; y++) {
+      const si = (y * w + x) * 4;       // RGBA индекс исходного пикселя
+      const R = data[si], G = data[si+1], B = data[si+2];
+
+      // RGB565 (r5 g6 b5), big-endian (MSB, LSB)
+      const v = ((R >>> 3) << 11) | ((G >>> 2) << 5) | (B >>> 3);
+      const j = 2 * y;                  // позиция пикселя в выходной "строке"
+      row[j] = (v >>> 8) & 0xFF;
+      row[j + 1] = v & 0xFF;
+    }
+    parts.push(row.slice());            // без добавления '\n'
+  }
+
+  return new Blob(parts, { type: 'application/octet-stream' });
+  }
+
+  async function uploadP16(blob){
+    try {
+      const res = await fetch('/img', { method: 'POST', body: blob });
+      return res.ok;
+    } catch (e) { console.error(e); return false; }
+  }
+
+  function makeCard(rec){
+    const node = el.tpl.content.firstElementChild.cloneNode(true);
+    node.dataset.id = rec.id;
+    const img = node.querySelector('.thumb');
+    const upBtn = node.querySelector('.up');
+    const delBtn = node.querySelector('.del');
+
+    const url = URL.createObjectURL(rec.blob);
+    cacheURLs.set(rec.id, url);
+    img.src = url;
+
+    [upBtn, delBtn].forEach(wireRipple);
+
+    upBtn.addEventListener('click', async () => {
+      upBtn.disabled = true; upBtn.textContent = 'Converting…';
+      try {
+        const p16 = await buildP16FromBlob(rec.blob); // IMPORTANT: original image blob
+        upBtn.textContent = 'Uploading…';
+        const ok = await uploadP16(p16);
+        upBtn.textContent = ok ? 'Uploaded' : 'Failed';
+        if (ok) {
+          currentId = rec.id; await kvSet('currentId', currentId); showCurrent(url);
+        }
+      } catch (e){ console.error(e); upBtn.textContent = 'Error'; }
+      finally { setTimeout(()=>{ upBtn.disabled = false; upBtn.textContent = 'Upload'; }, 1200); }
+    });
+
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this image?')) return;
+      await deleteImage(rec.id);
+      const u = cacheURLs.get(rec.id); if (u) { URL.revokeObjectURL(u); cacheURLs.delete(rec.id); }
+      node.remove();
+      if (!el.grid.children.length) { el.empty.hidden = false; }
+      if (currentId === rec.id) { currentId = null; await kvDelete('currentId'); el.currentPreview.hidden = true; }
+    });
+
+    return node;
+  }
+
+  function showCurrent(url){ el.currentImg.src = url; el.currentPreview.hidden = false; }
+
+  async function refresh(){
+    const list = await getAllImages();
+    for (const [, url] of cacheURLs) URL.revokeObjectURL(url);
+    cacheURLs.clear();
+
+    el.grid.innerHTML = '';
+    if (!list.length) { el.empty.hidden = false; if (!currentId) el.currentPreview.hidden = true; return; }
+    el.empty.hidden = true;
+
+    list.sort((a,b)=> b.addedAt - a.addedAt);
+
+    const frag = document.createDocumentFragment();
+    for (const rec of list) frag.appendChild(makeCard(rec));
+    el.grid.appendChild(frag);
+
+    if (currentId != null) {
+      const url = cacheURLs.get(currentId);
+      if (url) showCurrent(url); else el.currentPreview.hidden = true;
+    }
+  }
+
+  async function handleFiles(files){
+    const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!imgs.length) return;
+    for (const file of imgs) { try { await addImage(file); } catch(e){ console.error(e); } }
+    await refresh();
+  }
+
+  // ===== Settings save/load =====
+  const DEFAULT_SETTINGS = { pxCount: 64, canonMode: false, startPause: 0 };
+
+  async function loadSettings(){
+    const s = await kvGet('settings');
+    const cfg = Object.assign({}, DEFAULT_SETTINGS, s || {});
+    el.pxCount.value = cfg.pxCount;
+    el.canonMode.checked = !!cfg.canonMode;
+    el.startPause.value = cfg.startPause;
+  }
+
+  async function saveSettings(){
+    const px = Math.max(1, Math.floor(Number(el.pxCount.value || 0)));
+    const canon = !!el.canonMode.checked;
+    const pause = Math.max(0, Math.floor(Number(el.startPause.value || 0)));
+
+    const cfg = { pxCount: px, canonMode: canon, startPause: pause };
+    await kvSet('settings', cfg);
+
+    const btn = el.saveSettings; btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+      btn.textContent = res.ok ? 'Saved' : 'Failed';
+    } catch (e){ console.error(e); btn.textContent = 'Error'; }
+    finally { setTimeout(()=>{ btn.disabled = false; btn.textContent = 'Save settings'; }, 1200); }
+  }
+
+  // ===== Init =====
+  (async function init(){
+    db = await idbOpen();
+    currentId = await kvGet('currentId');
+
+    await loadSettings();
+    await refresh();
+
+    [document.getElementById('addBtn'), document.getElementById('saveSettings')].forEach(wireRipple);
+    el.addBtn.addEventListener('click', ()=> el.fileInput.click());
+    el.fileInput.addEventListener('change', (e)=> handleFiles(e.target.files));
+    el.saveSettings.addEventListener('click', saveSettings);
+  })();
+  </script>
+</body>
+</html>
